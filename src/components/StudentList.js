@@ -12,7 +12,8 @@ import {
     Dialog,
     DialogActions,
     DialogContent,
-    DialogTitle
+    DialogTitle,
+    CircularProgress
 } from '@mui/material';
 import { styled } from '@mui/system';
 
@@ -28,12 +29,25 @@ function StudentList() {
     const [form, setForm] = useState({ name: '', age: '', grade: '' });
     const [editingStudent, setEditingStudent] = useState(null);
     const [open, setOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    // Dynamically use the environment variable for the backend URL
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
     useEffect(() => {
-        axios.get('http://localhost:5000/api/students')
-            .then(response => setStudents(response.data))
-            .catch(error => console.error(error));
-    }, []);
+        setLoading(true);
+        axios.get(`${API_URL}/students`)
+            .then(response => {
+                setStudents(response.data);
+                setLoading(false);
+            })
+            .catch(error => {
+                console.error(error);
+                setError('Failed to load students');
+                setLoading(false);
+            });
+    }, [API_URL]);
 
     const handleChange = (e) => {
         setForm({ ...form, [e.target.name]: e.target.value });
@@ -41,17 +55,30 @@ function StudentList() {
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        setLoading(true);
         if (editingStudent) {
-            axios.put(`http://localhost:5000/api/students/${editingStudent._id}`, form)
+            axios.put(`${API_URL}/students/${editingStudent._id}`, form)
                 .then(response => {
                     setStudents(students.map(student => student._id === editingStudent._id ? response.data : student));
                     setEditingStudent(null);
+                    setLoading(false);
                 })
-                .catch(error => console.error(error));
+                .catch(error => {
+                    console.error(error);
+                    setError('Failed to update student');
+                    setLoading(false);
+                });
         } else {
-            axios.post('http://localhost:5000/api/students', form)
-                .then(response => setStudents([...students, response.data]))
-                .catch(error => console.error(error));
+            axios.post(`${API_URL}/students`, form)
+                .then(response => {
+                    setStudents([...students, response.data]);
+                    setLoading(false);
+                })
+                .catch(error => {
+                    console.error(error);
+                    setError('Failed to add student');
+                    setLoading(false);
+                });
         }
         setForm({ name: '', age: '', grade: '' });
         handleClose();
@@ -64,9 +91,17 @@ function StudentList() {
     };
 
     const handleDelete = (id) => {
-        axios.delete(`http://localhost:5000/api/students/${id}`)
-            .then(() => setStudents(students.filter(student => student._id !== id)))
-            .catch(error => console.error(error));
+        setLoading(true);
+        axios.delete(`${API_URL}/students/${id}`)
+            .then(() => {
+                setStudents(students.filter(student => student._id !== id));
+                setLoading(false);
+            })
+            .catch(error => {
+                console.error(error);
+                setError('Failed to delete student');
+                setLoading(false);
+            });
     };
 
     const handleClickOpen = () => {
@@ -82,6 +117,10 @@ function StudentList() {
     return (
         <Container>
             <Typography variant="h4" gutterBottom>Students</Typography>
+            {loading && <CircularProgress />}
+
+            {error && <Typography color="error" variant="body1">{error}</Typography>}
+
             <Grid container spacing={4}>
                 {students.map(student => (
                     <Grid item xs={12} sm={6} md={4} key={student._id}>
@@ -99,6 +138,7 @@ function StudentList() {
                     </Grid>
                 ))}
             </Grid>
+
             <Button variant="contained" color="primary" onClick={handleClickOpen} style={{ marginTop: '20px' }}>Add Student</Button>
 
             <Dialog open={open} onClose={handleClose}>
@@ -110,7 +150,7 @@ function StudentList() {
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={handleClose} color="primary">Cancel</Button>
-                    <Button onClick={handleSubmit} color="primary">{editingStudent ? 'Update' : 'Add'}</Button>
+                    <Button onClick={handleSubmit} color="primary" disabled={loading}>{editingStudent ? 'Update' : 'Add'}</Button>
                 </DialogActions>
             </Dialog>
         </Container>

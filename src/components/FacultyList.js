@@ -12,7 +12,8 @@ import {
     Dialog,
     DialogActions,
     DialogContent,
-    DialogTitle
+    DialogTitle,
+    CircularProgress
 } from '@mui/material';
 import { styled } from '@mui/system';
 
@@ -28,12 +29,25 @@ function FacultyList() {
     const [form, setForm] = useState({ name: '', department: '', experience: '' });
     const [editingFaculty, setEditingFaculty] = useState(null);
     const [open, setOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    // Dynamically use the environment variable for the backend URL
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
     useEffect(() => {
-        axios.get('http://localhost:5000/api/faculty')
-            .then(response => setFaculty(response.data))
-            .catch(error => console.error(error));
-    }, []);
+        setLoading(true);
+        axios.get(`${API_URL}/faculty`)
+            .then(response => {
+                setFaculty(response.data);
+                setLoading(false);
+            })
+            .catch(error => {
+                console.error(error);
+                setError('Failed to load faculty members');
+                setLoading(false);
+            });
+    }, [API_URL]);
 
     const handleChange = (e) => {
         setForm({ ...form, [e.target.name]: e.target.value });
@@ -41,17 +55,30 @@ function FacultyList() {
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        setLoading(true);
         if (editingFaculty) {
-            axios.put(`http://localhost:5000/api/faculty/${editingFaculty._id}`, form)
+            axios.put(`${API_URL}/faculty/${editingFaculty._id}`, form)
                 .then(response => {
                     setFaculty(faculty.map(member => member._id === editingFaculty._id ? response.data : member));
                     setEditingFaculty(null);
+                    setLoading(false);
                 })
-                .catch(error => console.error(error));
+                .catch(error => {
+                    console.error(error);
+                    setError('Failed to update faculty member');
+                    setLoading(false);
+                });
         } else {
-            axios.post('http://localhost:5000/api/faculty', form)
-                .then(response => setFaculty([...faculty, response.data]))
-                .catch(error => console.error(error));
+            axios.post(`${API_URL}/faculty`, form)
+                .then(response => {
+                    setFaculty([...faculty, response.data]);
+                    setLoading(false);
+                })
+                .catch(error => {
+                    console.error(error);
+                    setError('Failed to add faculty member');
+                    setLoading(false);
+                });
         }
         setForm({ name: '', department: '', experience: '' });
         handleClose();
@@ -64,9 +91,17 @@ function FacultyList() {
     };
 
     const handleDelete = (id) => {
-        axios.delete(`http://localhost:5000/api/faculty/${id}`)
-            .then(() => setFaculty(faculty.filter(member => member._id !== id)))
-            .catch(error => console.error(error));
+        setLoading(true);
+        axios.delete(`${API_URL}/faculty/${id}`)
+            .then(() => {
+                setFaculty(faculty.filter(member => member._id !== id));
+                setLoading(false);
+            })
+            .catch(error => {
+                console.error(error);
+                setError('Failed to delete faculty member');
+                setLoading(false);
+            });
     };
 
     const handleClickOpen = () => {
@@ -82,6 +117,10 @@ function FacultyList() {
     return (
         <Container>
             <Typography variant="h4" gutterBottom>Faculty</Typography>
+            {loading && <CircularProgress />}
+
+            {error && <Typography color="error" variant="body1">{error}</Typography>}
+
             <Grid container spacing={4}>
                 {faculty.map(member => (
                     <Grid item xs={12} sm={6} md={4} key={member._id}>
@@ -99,6 +138,7 @@ function FacultyList() {
                     </Grid>
                 ))}
             </Grid>
+
             <Button variant="contained" color="primary" onClick={handleClickOpen} style={{ marginTop: '20px' }}>Add Faculty</Button>
 
             <Dialog open={open} onClose={handleClose}>
@@ -110,7 +150,7 @@ function FacultyList() {
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={handleClose} color="primary">Cancel</Button>
-                    <Button onClick={handleSubmit} color="primary">{editingFaculty ? 'Update' : 'Add'}</Button>
+                    <Button onClick={handleSubmit} color="primary" disabled={loading}>{editingFaculty ? 'Update' : 'Add'}</Button>
                 </DialogActions>
             </Dialog>
         </Container>
